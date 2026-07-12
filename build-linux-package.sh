@@ -36,7 +36,7 @@ cat > "$PKG/run.sh" <<'RUN'
 cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 WALLET="${WALLET:-lta1qYOUR_WALLET_ADDRESS}"
 REGION="${REGION:-eu}"          # eu | us | na | sg | ru
-POOL="${POOL:-stratum+tcp://${REGION}.coin-miners.info:4444}"
+POOL="${POOL:-stratum+tcp://${REGION}.coin-miners.info:8590}"
 export LD_LIBRARY_PATH="$(pwd)/lib:$LD_LIBRARY_PATH"
 exec ./ccminer -a sha3d -o "$POOL" -u "$WALLET" -p x "$@"
 RUN
@@ -52,9 +52,9 @@ Run:
   WALLET=lta1q<your address> ./run.sh
 or directly:
   LD_LIBRARY_PATH=./lib ./ccminer -a sha3d \\
-    -o stratum+tcp://eu.coin-miners.info:4444 -u lta1q<your address> -p x
+    -o stratum+tcp://eu.coin-miners.info:8590 -u lta1q<your address> -p x
 
-Pools: eu / us / na / sg / ru . coin-miners.info : 4444
+Pools: eu / us / na / sg / ru . coin-miners.info : 8590
 README
 
 OUT="$PWD/${NAME}-linux-${VER}.tar.gz"
