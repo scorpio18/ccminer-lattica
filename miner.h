@@ -330,6 +330,7 @@ extern int scanhash_quark(int thr_id, struct work *work, uint32_t max_nonce, uns
 extern int scanhash_qubit(int thr_id, struct work* work, uint32_t max_nonce, unsigned long *hashes_done);
 extern int scanhash_rinhash(int thr_id, struct work* work, uint32_t max_nonce, unsigned long *hashes_done);
 extern int scanhash_sha256d(int thr_id, struct work *work, uint32_t max_nonce, unsigned long *hashes_done);
+extern int scanhash_basecoin(int thr_id, struct work *work, uint32_t max_nonce, unsigned long *hashes_done);
 extern int scanhash_sha256t(int thr_id, struct work *work, uint32_t max_nonce, unsigned long *hashes_done);
 extern int scanhash_sha256csm(int thr_id, struct work* work, uint32_t max_nonce, unsigned long* hashes_done);
 extern int scanhash_sha3d(int thr_id, struct work *work, uint32_t max_nonce, unsigned long *hashes_done);
@@ -411,6 +412,7 @@ extern void free_polytimos(int thr_id);
 extern void free_quark(int thr_id);
 extern void free_qubit(int thr_id);
 extern void free_sha256d(int thr_id);
+extern void free_basecoin(int thr_id);
 extern void free_sha256csm(int thr_id);
 extern void free_sha256t(int thr_id);
 extern void free_sha3d(int thr_id);
@@ -668,6 +670,7 @@ extern void gpulog(int prio, int thr_id, const char *fmt, ...);
 void get_defconfig_path(char *out, size_t bufsize, char *argv0);
 extern void cbin2hex(char *out, const char *in, size_t len);
 extern char *bin2hex(const unsigned char *in, size_t len);
+size_t solo_address_to_script(unsigned char *out, size_t outsz, const char *addr);
 extern bool hex2bin(void *output, const char *hexstr, size_t len);
 extern int timeval_subtract(struct timeval *result, struct timeval *x,
 	struct timeval *y);
@@ -774,6 +777,10 @@ struct work {
 	double targetdiff;
 
 	uint32_t height;
+
+	/* Solo getblocktemplate: full block tail hex for submitblock (after 80-byte header) */
+	char *gbt_txs_hex;
+	char *gbt_workid;
 
 	uint32_t scanned_from;
 	uint32_t scanned_to;

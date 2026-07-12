@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <memory.h>
 #include <string.h>
 #include <unistd.h>
@@ -18,6 +18,20 @@
 #include "nvml.h"
 
 #include "cuda_runtime.h"
+
+/* cudaDeviceProp.clockRate / memoryClockRate were removed in newer CUDA toolkits; attributes still work. */
+static void cuda_device_clock_rates_khz(int device, int *sm_clock_khz, int *mem_clock_khz)
+{
+	int c = 0, m = 0;
+	if (cudaDeviceGetAttribute(&c, cudaDevAttrClockRate, device) != cudaSuccess)
+		c = 0;
+	if (cudaDeviceGetAttribute(&m, cudaDevAttrMemoryClockRate, device) != cudaSuccess)
+		m = 0;
+	if (sm_clock_khz)
+		*sm_clock_khz = c;
+	if (mem_clock_khz)
+		*mem_clock_khz = m;
+}
 
 #ifdef __cplusplus
 /* miner.h functions are declared in C type, not C++ */
@@ -102,10 +116,12 @@ void cuda_print_devices()
 		cudaDeviceProp props;
 		cudaGetDeviceProperties(&props, dev_id);
 		if (!opt_n_threads || n < opt_n_threads) {
+			int clk_khz = 0, mclk_khz = 0;
+			cuda_device_clock_rates_khz(dev_id, &clk_khz, &mclk_khz);
 			fprintf(stderr, "GPU #%d: SM %d.%d %s @ %.0f MHz (MEM %.0f)\n", dev_id,
 				props.major, props.minor, device_name[dev_id],
-				(double) props.clockRate/1000,
-				(double) props.memoryClockRate/1000);
+				(double) clk_khz / 1000.0,
+				(double) mclk_khz / 1000.0);
 #ifdef USE_WRAPNVML
 			if (opt_debug) nvml_print_device_info(dev_id);
 #ifdef WIN32
@@ -255,8 +271,10 @@ int cuda_gpu_info(struct cgpu_info *gpu)
 {
 	cudaDeviceProp props;
 	if (cudaGetDeviceProperties(&props, gpu->gpu_id) == cudaSuccess) {
-		gpu->gpu_clock = (uint32_t) props.clockRate;
-		gpu->gpu_memclock = (uint32_t) props.memoryClockRate;
+		int clk_khz = 0, mclk_khz = 0;
+		cuda_device_clock_rates_khz((int)gpu->gpu_id, &clk_khz, &mclk_khz);
+		gpu->gpu_clock = (uint32_t)clk_khz;
+		gpu->gpu_memclock = (uint32_t)mclk_khz;
 		gpu->gpu_mem = (uint64_t) (props.totalGlobalMem / 1024); // kB
 #if defined(_WIN32) && defined(USE_WRAPNVML)
 		// required to get mem size > 4GB (size_t too small for bytes on 32bit)

@@ -524,6 +524,7 @@
     <CudaCompile Include="scrypt\salsa_kernel.cu">
     </CudaCompile>
     <CudaCompile Include="sha256\cuda_sha256csm.cu" />
+    <CudaCompile Include="sha512\sha512bc.cu" />
     <CudaCompile Include="sha256\cuda_sha256d.cu" />
     <CudaCompile Include="sha256\sha256csm.cu" />
     <CudaCompile Include="sha256\sha256d.cu" />

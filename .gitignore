@@ -69,3 +69,10 @@ compat/curl-for-windows/
 *.cudafe2.c
 
 *.bak
+/LATTICA.md
+/basecoin/
+/ccminer-cuda12.8-ubuntu20
+/ccminer-lattica-*.tar.gz
+/configure~
+/config.status
+/ccminer

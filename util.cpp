@@ -430,11 +430,10 @@ static json_t *json_rpc_call(CURL *curl, const char *url,
 	json_t *val, *err_val, *res_val;
 	int rc;
 	struct data_buffer all_data = { 0 };
-	struct upload_buffer upload_data;
 	json_error_t err;
 	struct curl_slist *headers = NULL;
 	char *httpdata;
-	char len_hdr[64], hashrate_hdr[64];
+	char hashrate_hdr[64];
 	char curl_err_str[CURL_ERROR_SIZE] = { 0 };
 	long timeout = longpoll ? opt_timeout : opt_timeout/2;
 	struct header_info hi = { 0 };
@@ -456,10 +455,6 @@ static json_t *json_rpc_call(CURL *curl, const char *url,
 	curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, all_data_cb);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &all_data);
-#if LIBCURL_VERSION_NUM >= 0x071200
-	curl_easy_setopt(curl, CURLOPT_SEEKFUNCTION, &seek_data_cb);
-	curl_easy_setopt(curl, CURLOPT_SEEKDATA, &upload_data);
-#endif
 	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_err_str);
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
@@ -479,19 +474,17 @@ static json_t *json_rpc_call(CURL *curl, const char *url,
 	if (keepalive)
 		curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, sockopt_keepalive_cb);
 #endif
-	curl_easy_setopt(curl, CURLOPT_POST, 1);
+	/* POST body must be set here; CURLOPT_POST alone without READFUNCTION
+	 * produced chunked requests with no payload on some libcurl builds,
+	 * which left Bitcoin-style RPC servers waiting forever. */
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, rpc_req);
 
 	if (opt_protocol)
 		applog(LOG_DEBUG, "JSON protocol request:\n%s", rpc_req);
 
-	upload_data.buf = rpc_req;
-	upload_data.len = strlen(rpc_req);
-	upload_data.pos = 0;
-	sprintf(len_hdr, "Content-Length: %lu", (unsigned long) upload_data.len);
 	sprintf(hashrate_hdr, "X-Mining-Hashrate: %llu", (unsigned long long) global_hashrate);
 
 	headers = curl_slist_append(headers, "Content-Type: application/json");
-	headers = curl_slist_append(headers, len_hdr);
 	headers = curl_slist_append(headers, "User-Agent: " USER_AGENT);
 	headers = curl_slist_append(headers, "X-Mining-Extensions: longpoll noncerange reject-reason");
 	headers = curl_slist_append(headers, hashrate_hdr);
@@ -556,38 +549,33 @@ static json_t *json_rpc_call(CURL *curl, const char *url,
 		free(s);
 	}
 
-	/* JSON-RPC valid response returns a non-null 'result',
-	 * and a null 'error'. */
+	/* JSON-RPC 2.0: only a non-null error object means failure.
+	 * result may be null (e.g. Bitcoin submitblock success). */
 	res_val = json_object_get(val, "result");
 	err_val = json_object_get(val, "error");
 
-	if (!res_val || json_is_null(res_val) ||
-	    (err_val && !json_is_null(err_val))) {
-		char *s = NULL;
+	if (err_val && !json_is_null(err_val)) {
+		char *s;
+		json_t *msg = json_object_get(err_val, "message");
+		json_t *err_code = json_object_get(err_val, "code");
 
-		if (err_val) {
-			s = json_dumps(err_val, 0);
-			json_t *msg = json_object_get(err_val, "message");
-			json_t *err_code = json_object_get(err_val, "code");
-			if (curl_err && json_integer_value(err_code))
-				*curl_err = (int) json_integer_value(err_code);
+		if (curl_err && json_integer_value(err_code))
+			*curl_err = (int) json_integer_value(err_code);
 
-			if (json_is_string(msg)) {
+		if (json_is_string(msg)) {
+			s = strdup(json_string_value(msg));
+			if (have_longpoll && s && !strcmp(s, "method not getwork")) {
 				free(s);
-				s = strdup(json_string_value(msg));
-				if (have_longpoll && s && !strcmp(s, "method not getwork")) {
-					json_decref(err_val);
-					free(s);
-					goto err_out;
-				}
+				goto err_out;
 			}
-			json_decref(err_val);
+		} else {
+			s = json_dumps(err_val, 0);
+			if (!s)
+				s = strdup("(unknown reason)");
 		}
-		else
-			s = strdup("(unknown reason)");
 
 		if (!curl_err || opt_debug)
-			applog(LOG_ERR, "JSON-RPC call failed: %s", s);
+			applog(LOG_ERR, "JSON-RPC call failed: %s", s ? s : "(null)");
 
 		free(s);
 

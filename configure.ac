@@ -133,14 +133,17 @@ NVCC="nvcc"
 
 if test -n "$with_cuda" ; then
   CUDA_INCLUDES="-I$with_cuda/include"
-  CUDA_LIBS="-lcudart"
+  # Static CUDA runtime (+ static libstdc++) for a portable binary: a
+  # CUDA-12.8-built binary with libcudart baked in runs on any 12.8+ or 13.x
+  # driver, needing only the driver (libcuda) present on the rig — no toolkit.
+  CUDA_LIBS="-lcudart_static -lculibos -ldl -lrt -static-libstdc++"
   CUDA_LDFLAGS="-L$with_cuda/lib$SUFFIX"
   if test -x "$with_cuda/bin/nvcc" ; then
     NVCC="$with_cuda/bin/nvcc"
   fi
 else
   CUDA_INCLUDES="-I/usr/local/cuda/include"
-  CUDA_LIBS="-lcudart -static-libstdc++"
+  CUDA_LIBS="-lcudart_static -lculibos -ldl -lrt -static-libstdc++"
   CUDA_LDFLAGS="-L/usr/local/cuda/lib$SUFFIX"
 fi
 

@@ -258,8 +258,12 @@ int find_optimal_blockcount(int thr_id, KernelInterface* &kernel, bool &concurre
 	WARPS_PER_BLOCK = -1;
 
 	// if not specified, use interactive mode for devices that have the watchdog timer enabled
-	if (device_interactive[thr_id] == -1)
-		device_interactive[thr_id] = props.kernelExecTimeoutEnabled;
+	if (device_interactive[thr_id] == -1) {
+		int kexec_timeout = 0;
+		if (cudaDeviceGetAttribute(&kexec_timeout, cudaDevAttrKernelExecTimeout, device_map[thr_id]) != cudaSuccess)
+			kexec_timeout = 0;
+		device_interactive[thr_id] = kexec_timeout;
+	}
 
 	// turn off texture cache if not otherwise specified
 	if (device_texturecache[thr_id] == -1)

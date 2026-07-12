@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ccminer implementation from https://github.com/minershive/hiveos-linux/tree/master/hive/miners/ccminer
 
-. /hive/miners/custom/ccminer-kudaraidee/h-manifest.conf
+. /hive/miners/custom/ccminer-lattica/h-manifest.conf
 
 threads=`echo "threads" | nc -w 5 localhost ${MINER_API_PORT} | tr -d '\0'` #&& echo $threads
 if [[ $? -ne 0  || -z $threads ]]; then
@@ -26,8 +26,14 @@ else
 
 	#local nvidiastats
 	for (( i=0; i < ${#cckhs[@]}; i++ )); do
-		#if temp is 0 then driver or GPU failed
-		[[ ${cctemps[$i]} == "0.0" ]] && cckhs[$i]="0.0"
+		# The miner reports 0.0 temp only when its NVML read fails; fall back to
+		# HiveOS's own gpu_stats temp (by bus id) instead of zeroing the hashrate
+		# (which would hide a healthy, mining GPU from the dashboard).
+		if [[ ${cctemps[$i]} == "0.0" || -z ${cctemps[$i]} ]]; then
+			local _bid=`echo ${ccbusids[$i]} | awk '{ printf("%02x:00.0", $1) }'`
+			local _gi=`echo "$gpu_stats" | jq -r ".busids|index(\"$_bid\")" 2>/dev/null`
+			[[ -n $_gi && $_gi != "null" ]] && cctemps[$i]=`echo "$gpu_stats" | jq -r ".temp[$_gi] // 0" 2>/dev/null`
+		fi
 
 		#cckhs[$i]="84316579.94" #test
 		#check Ghs. 1080ti gives ~64mh (64000kh) on lyra. when it's showing ghs then load is 0 on gpu
@@ -60,5 +66,5 @@ else
 		--argjson fan "`echo \"$striplines\" | grep 'FAN=' | sed -e 's/.*=//' | jq -cs '.'`" \
 		--arg ac "$ac" --arg rj "$rj" --argjson bus_numbers "$bus_numbers" \
 		--arg ver "$ver" \
-		'{hs: $hs, $temp, $fan, $uptime, ar: [$ac, $rj], $bus_numbers, algo: "radiant", $ver}')
+		'{hs: $hs, $temp, $fan, $uptime, ar: [$ac, $rj], $bus_numbers, algo: $algo, $ver}')
 fi
