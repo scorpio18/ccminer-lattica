@@ -14,22 +14,9 @@ install -m755 "$BIN" "/tmp/hivepkg/$NAME/ccminer"
 install -m755 hive/h-config.sh hive/h-run.sh hive/h-stats.sh "/tmp/hivepkg/$NAME/"
 install -m644 hive/h-manifest.conf "/tmp/hivepkg/$NAME/"
 
-# Bundle runtime libs HiveOS's minimal userland may lack (OpenSSL 1.1 + jansson),
-# so ./ccminer never dies with "libcrypto.so.1.1: cannot open shared object file".
-# h-run.sh prepends this lib/ dir to LD_LIBRARY_PATH. Pulled from the SAME image
-# the binary was built in, so the ABI matches. libcurl stays a host dep (HiveOS's
-# own ccminer uses it, so it's always present).
-IMAGE="${IMAGE:-nvidia/cuda:12.8.1-devel-ubuntu20.04}"
-mkdir -p "/tmp/hivepkg/$NAME/lib"
-docker run --rm -v "/tmp/hivepkg/$NAME/lib":/out "$IMAGE" bash -c '
-  set -e; export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq >/dev/null
-  apt-get install -y -qq libssl1.1 libjansson4 >/dev/null 2>&1
-  for f in libcrypto.so.1.1 libssl.so.1.1 libjansson.so.4; do
-    cp -L "$(find /usr/lib /lib -name "$f" 2>/dev/null | head -1)" /out/
-  done
-  chmod 644 /out/*
-'
+# No bundled libs since 1.1: OpenSSL + jansson are linked STATICALLY into the
+# binary (see build-release.sh), so ./ccminer runs directly on any host — only
+# libcurl (ubiquitous, incl. HiveOS) and glibc >= 2.31 are needed.
 
 OUT="$PWD/${NAME}-${VER}.tar.gz"
 tar -czf "$OUT" -C /tmp/hivepkg "$NAME"

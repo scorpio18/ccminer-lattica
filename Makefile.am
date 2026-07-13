@@ -27,9 +27,10 @@ ccminer_SOURCES = elist.h miner.h compat.h \
 			  api.cpp hashlog.cpp nvml.cpp stats.cpp sysinfos.cpp cuda.cpp \
 			  nvsettings.cpp \
 			  algo_stubs.cpp \
-			  Algo256/sha3d.cu Algo256/cuda_keccak256.cu Algo256/cuda_keccak256_sha3d.cu \
+			  algos/sha3d/sha3d.cu algos/sha3d/cuda_sha3d.cu \
+			  algos/keccak/cuda_keccak_selftest.cu cuda/keccak_device.cuh \
 			  cuda_checkhash.cu \
-			  sph/sha3d.c
+			  sph/sha3d.c sph/keccak.c
 
 if HAVE_NVML
 nvml_defs = -DUSE_WRAPNVML
