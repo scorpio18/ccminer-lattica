@@ -82,6 +82,23 @@ extern "C" int scanhash_sha3d(int thr_id, struct work* work, uint32_t max_nonce,
 
 		sha3d_cpu_hash_80(thr_id, throughput, pdata[19], work->nonces, highTarget);
 
+		// Discard any result OUTSIDE the sub-range this launch actually scanned
+		// [start, start+throughput). A value left in the device result buffer by
+		// a previous launch (same job, earlier sub-range) would otherwise be
+		// re-submitted and rejected by the pool as a duplicate ("nonce already
+		// sent"). Half-open interval, wrap-aware.
+		{
+			const uint32_t start = pdata[19];
+			const uint32_t span  = throughput; // launch scanned [start, start+span)
+			for (int i = 0; i < 2; i++) {
+				const uint32_t nn = work->nonces[i];
+				if (nn == UINT32_MAX) continue;
+				const uint32_t off = nn - start;   // wrap-aware distance from start
+				if (off >= span)
+					work->nonces[i] = UINT32_MAX;
+			}
+		}
+
 		// defensive: never report the same nonce in both result slots (a
 		// duplicate here would be submitted twice by the caller)
 		if (work->nonces[1] == work->nonces[0])

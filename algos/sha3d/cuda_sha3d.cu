@@ -139,6 +139,13 @@ void sha3d_cpu_hash_80(int thr_id, uint32_t threads, uint32_t startNonce, uint32
 
 	cudaMemcpy(h_sha3d_nonces[thr_id], d_sha3d_nonces[thr_id], NBN * sizeof(uint32_t), cudaMemcpyDeviceToHost);
 	memcpy(resNonces, h_sha3d_nonces[thr_id], NBN * sizeof(uint32_t));
+	// Re-arm the result buffer NOW, so a launch that finds nothing can't read
+	// back the PREVIOUS launch's nonce. Without this, after a found+submit the
+	// buffer still holds that nonce; the next launch (same job, new sub-range)
+	// finds nothing, copies out the stale value, and the caller submits it
+	// again — the pool/hashlog then reports "nonce already sent" (seen on fast
+	// GPUs that re-launch within the same job many times a second).
+	cudaMemset(d_sha3d_nonces[thr_id], 0xff, NBN * sizeof(uint32_t));
 }
 
 /* Precompute midstate from the first 72 bytes of the block header.
