@@ -41,6 +41,17 @@ static std::map<uint64_t, hashlog_data> tlastshares;
 
 extern struct stratum_ctx stratum;
 
+/* first 8 bytes of the work's extranonce2, as a comparable scalar */
+static uint64_t work_xn2_snapshot(const struct work* w)
+{
+	uint64_t x = 0;
+	int n = (int) w->xnonce2_len;
+	if (n > 8) n = 8;
+	for (int i = 0; i < n; i++)
+		x = (x << 8) | w->xnonce2[i];
+	return x;
+}
+
 /**
  * str hex to uint32
  */
@@ -54,7 +65,7 @@ static uint64_t hextouint(char* jobid)
 /**
  * @return time of a job/nonce submission (or last nonce if nonce is 0)
  */
-uint32_t hashlog_already_submittted(char* jobid, uint32_t nonce)
+uint32_t hashlog_already_submittted(char* jobid, uint32_t nonce, const struct work* work)
 {
 	uint32_t ret = 0;
 	uint64_t njobid = hextouint(jobid);
@@ -65,6 +76,12 @@ uint32_t hashlog_already_submittted(char* jobid, uint32_t nonce)
 		ret = hashlog_get_last_sent(jobid);
 	} else if (tlastshares.find(key) != tlastshares.end()) {
 		hashlog_data data = tlastshares[key];
+		// A fast GPU wraps the 32-bit nonce space in seconds and re-rolls
+		// extranonce2 (stratum_gen_work) — the same job+nonce on a DIFFERENT
+		// extranonce2 is a genuinely new share (the pool's own dedup key is
+		// job+extranonce2+ntime+nonce). Only same-xnonce2 is a duplicate.
+		if (work && data.xnonce2 != work_xn2_snapshot(work))
+			return 0;
 		ret = data.tm_sent;
 	}
 	return ret;
@@ -89,6 +106,7 @@ void hashlog_remember_submit(struct work* work, uint32_t nonce)
 	data.npool = (uint8_t) cur_pooln;
 	data.pool_type = pools[cur_pooln].type;
 	data.job_nonce_id = (uint8_t) stratum.job.shares_count;
+	data.xnonce2 = work_xn2_snapshot(work);
 	tlastshares[key] = data;
 }
 

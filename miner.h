@@ -535,6 +535,8 @@ struct hashlog_data {
 	uint32_t tm_add;
 	uint32_t tm_upd;
 	uint32_t tm_sent;
+	uint64_t xnonce2; // snapshot (first 8 bytes) — same job+nonce on a DIFFERENT
+	                  // extranonce2 is a new share, not a duplicate
 };
 
 /* end of api */
@@ -884,7 +886,7 @@ double equi_network_diff(struct work *work);
 void hashlog_remember_submit(struct work* work, uint32_t nonce);
 void hashlog_remember_scan_range(struct work* work);
 double hashlog_get_sharediff(char* jobid, int idnonce, double defvalue);
-uint32_t hashlog_already_submittted(char* jobid, uint32_t nounce);
+uint32_t hashlog_already_submittted(char* jobid, uint32_t nounce, const struct work* work);
 uint32_t hashlog_get_last_sent(char* jobid);
 uint64_t hashlog_get_scan_range(char* jobid);
 int  hashlog_get_history(struct hashlog_data *data, int max_records);

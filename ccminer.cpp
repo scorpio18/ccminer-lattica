@@ -103,6 +103,9 @@ bool have_stratum = false;
 bool allow_gbt = true;
 bool allow_mininginfo = true;
 bool check_dups = true; //false;
+// set by the duplicate-share handler (workio thread): makes the miner thread
+// regenerate work (fresh extranonce2) on its next loop, no stall
+static volatile bool g_force_regen = false;
 bool check_stratum_jobs = false;
 bool opt_submit_stale = false;
 bool submit_old = false;
@@ -1477,7 +1480,7 @@ static bool submit_upstream_work(CURL *curl, struct work *work)
 	if (pool->type & POOL_STRATUM && stratum.rpc2) {
 		struct work submit_work;
 		memcpy(&submit_work, work, sizeof(struct work));
-		if (!hashlog_already_submittted(submit_work.job_id, submit_work.nonces[idnonce])) {
+		if (!hashlog_already_submittted(submit_work.job_id, submit_work.nonces[idnonce], &submit_work)) {
 			if (rpc2_stratum_submit(pool, &submit_work))
 				hashlog_remember_submit(&submit_work, submit_work.nonces[idnonce]);
 			stratum.job.shares_count++;
@@ -1488,7 +1491,7 @@ static bool submit_upstream_work(CURL *curl, struct work *work)
 	if (pool->type & POOL_STRATUM && stratum.is_equihash) {
 		struct work submit_work;
 		memcpy(&submit_work, work, sizeof(struct work));
-		//if (!hashlog_already_submittted(submit_work.job_id, submit_work.nonces[idnonce])) {
+		//if (!hashlog_already_submittted(submit_work.job_id, submit_work.nonces[idnonce], &submit_work)) {
 			if (equi_stratum_submit(pool, &submit_work))
 				hashlog_remember_submit(&submit_work, submit_work.nonces[idnonce]);
 			stratum.job.shares_count++;
@@ -1592,7 +1595,7 @@ static bool submit_upstream_work(CURL *curl, struct work *work)
 		noncestr = bin2hex((const uchar*)(&nonce), 4);
 
 		if (check_dups)
-			sent = hashlog_already_submittted(work->job_id, nonce);
+			sent = hashlog_already_submittted(work->job_id, nonce, work);
 		if (sent > 0) {
 			sent = (uint32_t) time(NULL) - sent;
 			if (!opt_quiet) {
@@ -1600,8 +1603,10 @@ static bool submit_upstream_work(CURL *curl, struct work *work)
 				hashlog_dump_job(work->job_id);
 			}
 			free(noncestr);
-			// prevent useless computing on some pools
-			g_work_time = 0;
+			// A true duplicate means this work was already fully searched here:
+			// force an immediate work regen (fresh extranonce2) instead of the
+			// old g_work_time=0 path, which idled the GPU ~500ms per duplicate.
+			g_force_regen = true;
 			restart_threads();
 			return true;
 		}
@@ -2727,6 +2732,7 @@ static void *miner_thread(void *userdata)
 			//nonceptr = (uint32_t*) (((char*)work.data) + wcmplen);
 			pthread_mutex_lock(&g_work_lock);
 			extrajob |= work_done;
+			if (g_force_regen) { extrajob = true; g_force_regen = false; }
 
 			regen = (nonceptr[0] >= end_nonce);
 			if (opt_algo == ALGO_SIA) {
@@ -3019,7 +3025,7 @@ static void *miner_thread(void *userdata)
 			}
 		}
 
-		max64 *= (uint32_t)thr_hashrates[thr_id];
+		max64 *= (int64_t)thr_hashrates[thr_id]; // uint32 would truncate above 4.3 GH/s
 
 		/* on start, max64 should not be 0,
 		 *    before hashrate is computed */

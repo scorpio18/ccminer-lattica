@@ -82,6 +82,11 @@ extern "C" int scanhash_sha3d(int thr_id, struct work* work, uint32_t max_nonce,
 
 		sha3d_cpu_hash_80(thr_id, throughput, pdata[19], work->nonces, highTarget);
 
+		// defensive: never report the same nonce in both result slots (a
+		// duplicate here would be submitted twice by the caller)
+		if (work->nonces[1] == work->nonces[0])
+			work->nonces[1] = UINT32_MAX;
+
 		if (work->nonces[0] != UINT32_MAX && bench_algo < 0)
 		{
 			const uint32_t Htarg = ptarget[7];
