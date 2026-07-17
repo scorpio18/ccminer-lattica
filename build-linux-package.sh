@@ -20,7 +20,7 @@ cat > "$PKG/run.sh" <<'RUN'
 # ccminer-lattica launcher. Edit WALLET (and REGION) then: ./run.sh
 cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 WALLET="${WALLET:-lta1qYOUR_WALLET_ADDRESS}"
-REGION="${REGION:-eu}"          # eu | us | na | sg | ru
+REGION="${REGION:-eu}"          # eu | us | na | sg | ru | vn
 POOL="${POOL:-stratum+tcp://${REGION}.coin-miners.info:8590}"
 exec ./ccminer -a sha3d -o "$POOL" -u "$WALLET" -p x "$@"
 RUN
@@ -29,7 +29,7 @@ chmod +x "$PKG/run.sh"
 cat > "$PKG/README.txt" <<README
 ccminer-lattica ${VER} — GPU miner for Lattica (LTA), algo sha3d.
 
-Requirements: an NVIDIA GPU (RTX 3000/4000/5000 — sm_86/89/120) and a recent
+Requirements: an NVIDIA GPU (RTX 2000/3000/4000/5000 — sm_75/86/89/120) and a recent
 driver (CUDA 12.8+). Nothing else to install — OpenSSL/jansson are linked in;
 ./ccminer runs directly.
 
@@ -39,7 +39,7 @@ or directly:
   ./ccminer -a sha3d -o stratum+tcp://eu.coin-miners.info:8590 \\
     -u lta1q<your address> -p x
 
-Pools: eu / us / na / sg / ru . coin-miners.info : 8590
+Pools: eu / us / na / sg / ru / vn . coin-miners.info : 8590
 README
 
 OUT="$PWD/${NAME}-linux-${VER}.tar.gz"

@@ -62,6 +62,7 @@ nvcc_ARCH :=
 #nvcc_ARCH += -gencode=arch=compute_101,code=\"sm_101,compute_101\"
 #nvcc_ARCH += -gencode=arch=compute_100a,code=\"sm_100a,compute_100a\"
 #nvcc_ARCH += -gencode=arch=compute_100,code=\"sm_100,compute_100\"
+nvcc_ARCH += -gencode=arch=compute_75,code=\"sm_75,compute_75\"    # RTX 2000 (Turing)
 nvcc_ARCH += -gencode=arch=compute_86,code=\"sm_86,compute_86\"    # RTX 3000 (Ampere)
 nvcc_ARCH += -gencode=arch=compute_89,code=\"sm_89,compute_89\"    # RTX 4000 (Ada)
 nvcc_ARCH += -gencode=arch=compute_120,code=\"sm_120,compute_120\" # RTX 5000 (Blackwell)
