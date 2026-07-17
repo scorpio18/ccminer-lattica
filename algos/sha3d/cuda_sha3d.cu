@@ -43,11 +43,20 @@ void sha3d_gpu_hash_80(uint32_t threads, uint32_t startNonce, uint32_t *resNonce
 {
 	const uint32_t thread = blockDim.x * blockIdx.x + threadIdx.x;
 	const uint64_t step = (uint64_t)gridDim.x * blockDim.x;
-	const uint64_t maxNonce = (uint64_t)startNonce + threads;
+	uint64_t maxNonce = (uint64_t)startNonce + threads;
+	// Clamp to the 32-bit nonce space. The host do-while can hand us a final
+	// sub-range whose [startNonce, startNonce+threads) window straddles 2^32 (the
+	// GPU holding the TOP slice, whose end is 0xffffffff). Without this cap, any
+	// thread where (startNonce+thread) overflowed uint32 wrapped to a tiny value
+	// while maxNonce stayed >2^32, so it grid-strided ~512 times instead of once —
+	// that single chunk did ~512x the work, dragging the top-slice GPU to ~1/5
+	// hashrate at full power (100% util). Cap the ceiling AND widen the loop's
+	// start to uint64 so no thread ever scans past the 32-bit boundary.
+	if (maxNonce > 0x100000000ULL) maxNonce = 0x100000000ULL;
 
 	uint2 s[25], t[5], u[5], v, w;
 
-	for (uint64_t n = startNonce + thread; n < maxNonce; n += step) {
+	for (uint64_t n = (uint64_t)startNonce + thread; n < maxNonce; n += step) {
 	const uint32_t nonce = (uint32_t)n;
 
 	/* ── first SHA3-256: 80-byte header → 32-byte digest ─────────────────
